@@ -1,0 +1,35 @@
+let
+  /* Read a positive integer from the standard input.
+     Returns -1 on error */
+  function read_unsigned() : int =
+    /* ... complete here ... */
+    let 
+    	var valeur_ascii : int := 0
+    	var carac : string := ""
+    	var nombre : int := 0
+    	/* variable pour vérifier que la chaine ne contient que des chiffres */
+    	var only_numerical : int := 0
+    in
+    	while 1 do (
+    		carac := getchar();
+    		valeur_ascii := ord(carac);
+    		if valeur_ascii >= 48 & valeur_ascii <= 57 						
+    			then (only_numerical := 1; nombre :=  nombre * 10 + valeur_ascii - 48)
+    			
+    		else if valeur_ascii = 10
+    			then break
+    			
+    		else (only_numerical := 0; break)
+    	);
+    	
+    	if only_numerical = 0
+    		then -1
+    		else nombre
+    	
+    end
+    	
+  var a : int := read_unsigned()
+in
+  print_int(a*2);
+  print("\n")
+end
