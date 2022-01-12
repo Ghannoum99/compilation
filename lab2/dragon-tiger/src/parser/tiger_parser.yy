@@ -81,7 +81,7 @@ using utils::nl;
 
 %token <Symbol> ID "id"
 %token <Symbol> STRING "string"
-%token <int32_t> INT "integer"
+%token <int> INT "integer"
 
 // Declare the nonterminals types
 
@@ -90,8 +90,7 @@ using utils::nl;
 %type <std::vector<VarDecl *>> params nonemptyparams;
 %type <Decl *> decl funcDecl varDecl;
 %type <std::vector<Decl *>> decls;
-%type <Expr *> expr intExpr stringExpr seqExpr callExpr opExpr negExpr 
-			assignExpr whileExpr forExpr breakExpr letExpr var;
+%type <Expr *> expr stringExpr intExpr seqExpr callExpr opExpr negExpr assignExpr whileExpr forExpr breakExpr letExpr var ifThenElse ifThen;
 
 %type <std::vector<Expr *>> exprs nonemptyexprs;
 %type <std::vector<Expr *>> arguments nonemptyarguments;
@@ -105,7 +104,12 @@ using utils::nl;
 // Declare precedence rules
 
 %nonassoc FUNCTION VAR TYPE DO OF ASSIGN;
-%left UMINUS;
+%left LPAREN RPAREN LE LT GT GE NEQ EQ OR;
+%left AND;
+%left PLUS MINUS;
+%left TIMES DIVIDE;
+%left  UMINUS;
+
 
 // Declare grammar rules and production actions
 
@@ -118,8 +122,8 @@ decl: varDecl { $$ = $1; }
    | funcDecl { $$ = $1; }
 ;
 
-expr: intExpr { $$ = $1; }
-   | stringExpr { $$ = $1; }
+expr: stringExpr { $$ = $1; }
+   | intExpr { $$ = $1; }
    | seqExpr { $$ = $1; }
    | var { $$ = $1; }
    | callExpr { $$ = $1; }
@@ -130,6 +134,8 @@ expr: intExpr { $$ = $1; }
    | forExpr { $$ = $1; }
    | breakExpr { $$ = $1; }
    | letExpr { $$ = $1; }
+   | ifThenElse { $$ = $1; }
+   | ifThen { $$ = $1; }
 ;
 
 varDecl: VAR ID typeannotation ASSIGN expr
@@ -142,13 +148,12 @@ funcDecl: FUNCTION ID LPAREN params RPAREN typeannotation EQ expr
 
 /* Exprs */
 
-intExpr: INT
-  { $$ = new IntegerLiteral(@1, $1); }
-;
-
-
 stringExpr: STRING
   { $$ = new StringLiteral(@1, $1); }
+;
+
+intExpr : INT
+  { $$ = new IntegerLiteral(@1, $1); }
 ;
 
 var : ID
@@ -178,11 +183,23 @@ opExpr: expr PLUS expr   { $$ = new BinaryOperator(@2, $1, $3, o_plus); }
       | expr GE expr     { $$ = new BinaryOperator(@2, $1, $3, o_ge); }
       | expr AND expr    {
         $$ = new IfThenElse(@2, $1,
-                            new IfThenElse(@3, $3, new IntegerLiteral(nl, 1), new IntegerLiteral(nl, 0)),
+                            new IfThenElse(@3, $3, new IntegerLiteral(nl, 1),
+                            new IntegerLiteral(nl, 0)),
                             new IntegerLiteral(nl, 0));
       }
+      | expr OR expr    {
+        $$ = new IfThenElse(@2, $1, new IntegerLiteral(nl, 1),
+        		new IfThenElse(@3, $3, new IntegerLiteral(nl, 1), new IntegerLiteral(nl, 0)));
+      }
 ;
-
+   
+ifThen : IF expr THEN expr
+	{ $$ = new IfThenElse(@1,$2,$4,new Sequence(@1,{})); }
+;
+     
+ifThenElse : IF expr THEN expr ELSE expr
+	{ $$ = new IfThenElse(@1,$2,$4,$6); }
+;
 
 assignExpr: ID ASSIGN expr
   { $$ = new Assign(@2, new Identifier(@1, $1), $3); }

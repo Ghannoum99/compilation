@@ -24,7 +24,7 @@ static std::string string_buffer;
 lineterminator  \r|\n|\r\n
 blank           [ \t\f]
 id              [a-zA-Z][_0-9a-zA-Z]*
-integer			[1-9][0-9]*|0
+int         0|[1-9][0-9]*
 
  /* Declare two start conditions (sub-automate states) to handle
     strings and comments */
@@ -74,6 +74,8 @@ integer			[1-9][0-9]*|0
  /* Keywords */
 
 else     return yy::tiger_parser::make_ELSE(loc);
+if       return yy::tiger_parser::make_IF(loc);
+then     return yy::tiger_parser::make_THEN(loc);
 while    return yy::tiger_parser::make_WHILE(loc);
 for      return yy::tiger_parser::make_FOR(loc);
 to       return yy::tiger_parser::make_TO (loc);
@@ -85,26 +87,23 @@ break    return yy::tiger_parser::make_BREAK(loc);
 function return yy::tiger_parser::make_FUNCTION(loc);
 var      return yy::tiger_parser::make_VAR(loc);
 
- /* Integers */
-{integer} {
- 	
- 	long n = strtol(yytext, NULL, 10);
- 	if (n >= TIGER_INT_MAX) 
- 	{
- 		
- 		utils.error(loc, "integr too big");
- 		
- 	}
- 	
- 	return
- 	yy::tiger_parser::make_INT(int32_t(n), loc);
- }
- 
  /* Identifiers */
 {id}       return yy::tiger_parser::make_ID(Symbol(yytext), loc);
 
  /* Strings */
 \" {BEGIN(STRING); string_buffer.clear();}
+
+ /* Integers */
+{int} {
+  long yyval;
+  yyval = strtol(yytext, NULL, 10);
+
+  if(yyval>TIGER_INT_MAX) {
+    utils::error(loc, "unterminated string");
+  }
+  
+  return yy::tiger_parser::make_INT(strtol(yytext, NULL, 10), loc);
+}
 
 <STRING>{
     /* \" and \\ */
