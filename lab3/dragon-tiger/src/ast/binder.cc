@@ -134,18 +134,47 @@ void Binder::visit(Let &let) {
 }
 
 void Binder::visit(Identifier &id) {
+	
+	VarDecl* var = dynamic_cast<VarDecl*>(&find(id.loc, id.name));
+	
+	if(!var)
+	{
+		utils::error(id.loc, "Error illegal case....");
+	}
+	
+	else 
+	{
+		id.set_decl(var);
+		id.set_depth(currentDepth);
+		
+		if(var->get_depth() != currentDepth)
+			var->set_escapes();
+	}
+	
 }
 
 void Binder::visit(IfThenElse &ite) {
 }
 
 void Binder::visit(VarDecl &decl) {
+	
+	decl.set_depth(currentDepth);
+	
+	if(decl.get_expr())
+		decl.get_expr()->accept(*this);
+		
+	enter(decl);
+	
 }
 
 void Binder::visit(FunDecl &decl) {
   set_parent_and_external_name(decl);
   functions.push_back(&decl);
+  
   /* ... put your code here ... */
+  
+  
+  
   functions.pop_back();
 }
 

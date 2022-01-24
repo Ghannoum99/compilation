@@ -23,6 +23,8 @@ class Binder : public ASTVisitor {
   void enter_primitive(const std::string &, const boost::optional<Symbol> &,
                        const std::vector<Symbol> &);
   void set_parent_and_external_name(FunDecl &decl);
+  
+  int currentDepth = 0;
 
 public:
   Binder();
