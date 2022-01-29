@@ -125,72 +125,234 @@ void Binder::visit(StringLiteral &literal) {
 }
 
 void Binder::visit(BinaryOperator &op) {
+	
+	op.get_left().accept(*this);
+    op.get_right().accept(*this);
+	
 }
 
 void Binder::visit(Sequence &seq) {
+	size_t i = 0;
+	
+	std::vector<Expr *> exprs = seq.get_exprs();
+
+	for(i = 0; i < exprs.size(); i++)
+		exprs[i]->accept(*this);
+
 }
 
 void Binder::visit(Let &let) {
+	push_scope();
+	
+	std::vector<Decl*> &decls = let.get_decls();
+	Sequence &seq = let.get_sequence();
+	
+	Loop* bcl = bcl_act;
+	bcl_act = nullptr;
+	
+	auto it = decls.begin();
+	
+	while (it != decls.end())
+	{
+		
+		FunDecl* decl = dynamic_cast<FunDecl*>(*it);
+		std::vector<FunDecl*> fun_decls;
+		
+		if (!decl)
+		{
+			
+			(*it)->accept(*this);
+			it++;
+			
+			continue;
+			
+		}
+		
+		while (decl)
+		{
+			enter(*decl);
+		    fun_decls.push_back(decl);
+		    it++;
+		    
+		    if (it == decls.end())
+				break;
+		
+			decl = dynamic_cast<FunDecl*>(*it);
+        }
+        
+        for (size_t i = 0; i < fun_decls.size(); i++)
+			fun_decls[i]->accept(*this);
+			
+	}
+			
+	bcl_act = bcl;
+	seq.accept(*this);
+		
+	pop_scope();
+		
 }
 
 void Binder::visit(Identifier &id) {
+	/* Initialisation */
+	VarDecl* var_decl = dynamic_cast<VarDecl*>(&find(id.loc, id.name));
 	
-	VarDecl* var = dynamic_cast<VarDecl*>(&find(id.loc, id.name));
-	
-	if(!var)
+	if(!var_decl)
 	{
-		utils::error(id.loc, "Error illegal case....");
+		utils::error(id.loc, "Error: illegal case....");
 	}
 	
 	else 
 	{
-		id.set_decl(var);
-		id.set_depth(currentDepth);
+		id.set_decl(var_decl);
+		id.set_depth(functions.size());
 		
-		if(var->get_depth() != currentDepth)
-			var->set_escapes();
+		if(var_decl->get_depth() < id.get_depth())
+			var_decl->set_escapes();
 	}
 	
 }
 
 void Binder::visit(IfThenElse &ite) {
+	
+    ite.get_condition().accept(*this);
+   
+    ite.get_then_part().accept(*this);
+    
+    ite.get_else_part().accept(*this);
+    	
 }
 
 void Binder::visit(VarDecl &decl) {
 	
-	decl.set_depth(currentDepth);
+	/* Initialisations */
+	optional<Expr &> exprs = decl.get_expr();
 	
-	if(decl.get_expr())
-		decl.get_expr()->accept(*this);
+	decl.set_depth(functions.size());
+	
+	if(exprs)
+		exprs.value().accept(*this);
 		
 	enter(decl);
 	
 }
 
-void Binder::visit(FunDecl &decl) {
-  set_parent_and_external_name(decl);
-  functions.push_back(&decl);
-  
-  /* ... put your code here ... */
-  
-  
-  
-  functions.pop_back();
+void Binder::visit(FunDecl &decl) {  
+	
+	/* Initialisations */
+	size_t i = 0;
+	std::vector<VarDecl*> params = decl.get_params();
+	optional<Expr &> exprs = decl.get_expr();
+	std::vector<VarDecl*> escp_decls = decl.get_escaping_decls();
+	
+	set_parent_and_external_name(decl);
+    functions.push_back(&decl);
+    
+    /* ... put your code here ... */
+    decl.set_depth(functions.size()-1);
+
+    push_scope(); 
+    
+    for(i = 0; i < params.size(); i++)
+		params[i]->accept(*this);
+
+    if (exprs)
+	{
+		exprs.value().accept(*this);
+	}else
+	{
+		utils::error(decl.loc, "Error: function isn't defined...");
+	}
+	
+	for (i = 0; i < escp_decls.size(); i++)
+		escp_decls[i]->accept(*this);
+		
+    pop_scope(); 
+    
+    functions.pop_back();
 }
 
 void Binder::visit(FunCall &call) {
+	
+	/* Initialisation */
+	FunDecl *fun_decl = dynamic_cast<FunDecl*>(&find(call.loc, call.func_name));
+	std::vector<Expr *> &expr_args = call.get_args();
+	
+    if (!fun_decl)
+    {
+		
+		utils::error(call.loc, "Error: Declaration isn't found...");
+	
+	}else 
+	{
+		
+		call.set_depth(functions.size());
+		call.set_decl(fun_decl);
+
+		for (Expr* expr : expr_args)
+			expr->accept(*this);
+			
+	}
+	
 }
 
 void Binder::visit(WhileLoop &loop) {
+	
+	/* Initialisations */
+	Loop* bcl = bcl_act;
+	
+	loop.get_condition().accept(*this);
+	
+	bcl_act = &loop;
+	
+	loop.get_body().accept(*this);
+	
+	bcl_act = bcl;
+	
 }
 
 void Binder::visit(ForLoop &loop) {
+	
+	/* Initialisations */
+	Loop* bcl = bcl_act;
+	
+	loop.get_high().accept(*this);
+	push_scope();
+	loop.get_variable().accept(*this);
+	
+	bcl_act = &loop;
+
+	loop.get_body().accept(*this);
+    pop_scope();
+    
+    bcl_act = bcl;
+	
 }
 
 void Binder::visit(Break &b) {
+	
+	if (! bcl_act)
+		utils::error(b.loc, "Error: break must be inside the loop...");
+		
+	b.set_loop(bcl_act);
+		
 }
 
-void Binder::visit(Assign &assign) {
+void Binder::visit(Assign &assign) { 	
+	
+	/* Initialisations */
+	optional<VarDecl &> var_decl = assign.get_lhs().get_decl();
+	
+	assign.get_lhs().accept(*this);
+	assign.get_rhs().accept(*this);
+	
+	if (var_decl)
+	{
+		
+		if (var_decl.value().read_only)
+			utils::error(assign.loc, "Error: Variable is not assignable...");
+		
+	}
+	
 }
 
 } // namespace binder

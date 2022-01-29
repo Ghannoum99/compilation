@@ -15,6 +15,10 @@ class Binder : public ASTVisitor {
   std::vector<scope_t> scopes;
   std::vector<FunDecl *> functions;
   std::unordered_set<Symbol> external_names;
+  
+  /* boucle actuelle */
+  Loop* bcl_act = nullptr;
+  
   void push_scope();
   void pop_scope();
   scope_t &current_scope();
@@ -24,7 +28,6 @@ class Binder : public ASTVisitor {
                        const std::vector<Symbol> &);
   void set_parent_and_external_name(FunDecl &decl);
   
-  int currentDepth = 0;
 
 public:
   Binder();
